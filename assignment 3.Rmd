@@ -1,0 +1,105 @@
+---
+title: "NOAA Analysis"
+author: "Zeid El Ameli"
+date: "5/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+## R Markdown
+
+
+
+```{r data, echo=TRUE}
+noaa <- read.csv("~/NOAA.csv")
+```
+
+## Subseting Our Data
+
+the original dataframe is too large, we don't need all the columns in it. so, we limited the data to only a few columns that we're interested in.
+
+```{r pressure, echo=TRUE}
+sub_noaa <- noaa[c("BEGIN_DATE_TIME","END_DATE_TIME","EPISODE_ID","EVENT_ID","STATE","STATE_FIPS","CZ_NAME","CZ_TYPE","CZ_FIPS","EVENT_TYPE","SOURCE","BEGIN_LAT","BEGIN_LON","END_LAT","END_LON")]
+head(sub_noaa)
+```
+
+## Ordering Our Data
+
+Next step is ordering the data by the beginning year and month.
+```{r ordered, echo=TRUE}
+arranged_noaa <-noaa[order(noaa$BEGIN_YEARMONTH),]
+```
+
+## Changing The Case of States and Counties
+
+In our data, State & County names are stored in upper case. We will now change them to title case.
+
+```{r case_change, echo=TRUE}
+noaa$title_state <-str_to_title(noaa$STATE, locale = "en")
+noaa$title_cz <-str_to_title(noaa$CZ_NAME, locale = "en")
+```
+
+## Limiting Our Data
+
+Now, we want to only include data from CZ_TYPE of "C". 
+
+```{r filtered, echo=TRUE}
+filtered <- filter(noaa, CZ_TYPE == "C") %>%
+  select(-CZ_TYPE)
+```
+
+##Combining Columns
+
+We want to add a "0" in front of our STATE_FIPS & CZ_FIPS columns, then combine the two into 1!
+
+```{r concat, echo=TRUE}
+noaa$concat <- str_c("0",noaa$STATE_FIPS,"0",noaa$CZ_FIPS)
+```
+
+## Renaming Columns to Lower Case
+
+We noticed that all our column names are in UPPER CASE, we now want to change them to lower case.
+
+```{r tolower, echo=TRUE}
+noaa <- as_tibble(noaa)
+rename_all(noaa, tolower)
+```
+
+##Building Dataframes From Base R Code
+
+Base R has some useful datasets, ones of them is a dataset about US states and some valuable info about each. Let's build a dataframe from that dataset!
+
+```{r states, echo=TRUE}
+state_info <- data.frame(state=state.name, region=state.region, area=state.area)
+```
+
+## Merging Dataframes
+
+We now want to merge dataframes from both our own imported dataframe, and the base dataframe in R.
+
+```{r join, echo=TRUE}
+freq_table <- data.frame(table(noaa$STATE))
+freq_table1 <- rename(freq_table,c("state"="Var1"))
+freq_table1$title_state <- str_to_title(freq_table1$state, locale = "en")
+freq_table1 = freq_table1[-c(1)]
+merged <- merge(x=freq_table1,y=state_info,by.x="title_state",by.y="state")
+head(merged)
+```
+
+## Plotting Our Data
+
+Now, we would like to see a graph that shows us states by area and number of storms hit it in 1994.
+
+```{r plot, echo=TRUE}
+plot <- ggplot(merged, aes(x= area, y=Freq)) +
+  geom_point(aes(color = region)) +
+  labs(x="Land Area (Sq. Miles)", y="Number of Storms in 1994")
+plot
+```
